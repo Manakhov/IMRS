@@ -1,5 +1,5 @@
 from time import sleep
-from math import pi
+from math import pi, sqrt, acos
 try:
     import sim
 except:
@@ -22,10 +22,8 @@ def read_proximity_sensor(sensor_handle):
     return_tuple = sim.simxReadProximitySensor(clientID, sensor_handle, sim.simx_opmode_blocking)
     return_code = return_tuple[0]
     if not return_code:
-        # detection_state = return_tuple[1]
         detected_point = return_tuple[2]
-        detected_object_handle = return_tuple[3]
-        return detected_object_handle, detected_point[2]
+        return detected_point[2]
 
 
 def read_vision_sensor(sensor_handle):
@@ -39,6 +37,7 @@ def read_vision_sensor(sensor_handle):
 def set_joint_target_position(config, joint_list):
     for i in range(len(config)):
         sim.simxSetJointTargetPosition(clientID, joint_list[i], config[i], sim.simx_opmode_oneshot)
+        sleep(0.001)
 
 
 print('Program started')
@@ -55,15 +54,16 @@ if clientID != -1:
     proximity_sensor = get_object_handle('Proximity_sensor')
     vision_sensor = get_object_handle('Vision_sensor')
     joint_list = [base_axis, axis1_2, axis2_3, axis3_4, axis4_5]
-    member_1 = 0.363
-    member_2 = 0.532
-    member_4 = 0.543
-    member_5 = 0.092
-    start_config = [0, -pi/7, pi/5, 0, pi/8]  # [0, -pi/7, pi/5, 0, pi/8]
+    member_1 = 0.220/1.216
+    member_2 = 0.532/1.216
+    member_4 = 0.543/1.216
+    member_5 = 0.092/1.216
+    start_config = [0, -pi/7, pi/5, 0, pi/8]
     set_joint_target_position(start_config, joint_list)
     base_angle = start_config[0]
     axis1_2_angle = start_config[1]
     axis2_3_angle = start_config[2]
+    axis3_4_angle = start_config[3]
     finish_angle = start_config[4]
     finish_low_range = finish_angle - pi/6
     finish_high_range = finish_angle + pi/8
@@ -71,8 +71,6 @@ if clientID != -1:
     base_range = 2*pi
     base_step = base_range/100
     result = False
-    # switch_angle = pi/8
-    # step2_3 = 0.01
     finish_angle = finish_high_range
     while base_angle < base_range:
         if finish_angle <= finish_low_range or finish_angle >= finish_high_range:
@@ -92,69 +90,26 @@ if clientID != -1:
         base_angle = base_angle + base_step
         sim.simxSetJointTargetPosition(clientID, base_axis, base_angle, sim.simx_opmode_oneshot)
         sleep(0.001)
-
-
-    # while base_angle < 2*pi:
-    #     if finish_angle > 0:
-    #         while finish_angle > 0:
-    #             sim.simxSetJointTargetPosition(clientID, axis4_5, finish_angle, sim.simx_opmode_oneshot)
-    #             sleep(0.001)
-    #             if read_vision_sensor(vision_sensor) > 0.9:
-    #                 result = True
-    #                 break
-    #             finish_angle = finish_angle - pi/300
-    #     else:
-    #         while finish_angle < pi/3:
-    #             sim.simxSetJointTargetPosition(clientID, axis4_5, finish_angle, sim.simx_opmode_oneshot)
-    #             sleep(0.001)
-    #             if read_vision_sensor(vision_sensor) > 0.9:
-    #                 result = True
-    #                 break
-    #             finish_angle = finish_angle + pi/300
-    #     if result:
-    #         break
-    #     sim.simxSetJointTargetPosition(clientID, base_axis, base_angle, sim.simx_opmode_oneshot)
-    #     sleep(0.001)
-    #     base_angle = base_angle + pi/100
-    # detected_cube, distance = read_proximity_sensor(proximity_sensor)
-    # if finish_angle > switch_angle:
-    #     step2_3 = - step2_3
-    # result = False
-    # while True:
-    #     detected_handle, distance = read_proximity_sensor(proximity_sensor)
-    #     while detected_handle == detected_cube:
-    #         if distance < 0.03:
-    #             result = True
-    #             break
-    #         axis1_2_angle = axis1_2_angle - 0.01
-    #         sim.simxSetJointTargetPosition(clientID, axis1_2, axis1_2_angle, sim.simx_opmode_oneshot)
-    #         sleep(0.001)
-    #         detected_handle, distance = read_proximity_sensor(proximity_sensor)
-    #     if result:
-    #         break
-    #     while detected_handle != detected_cube:
-    #         axis2_3_angle = axis2_3_angle - step2_3
-    #         sim.simxSetJointTargetPosition(clientID, axis2_3, axis2_3_angle, sim.simx_opmode_oneshot)
-    #         sleep(0.001)
-    #         detected_handle, distance = read_proximity_sensor(proximity_sensor)
-    #     while detected_handle == detected_cube:
-    #         if distance < 0.03:
-    #             result = True
-    #             break
-    #         axis2_3_angle = axis2_3_angle - step2_3
-    #         sim.simxSetJointTargetPosition(clientID, axis2_3, axis2_3_angle, sim.simx_opmode_oneshot)
-    #         sleep(0.001)
-    #         detected_handle, distance = read_proximity_sensor(proximity_sensor)
-    #     if result:
-    #         break
-    #     while detected_handle != detected_cube:
-    #         axis1_2_angle = axis1_2_angle - 0.01
-    #         sim.simxSetJointTargetPosition(clientID, axis1_2, axis1_2_angle, sim.simx_opmode_oneshot)
-    #         sleep(0.001)
-    #         detected_handle, distance = read_proximity_sensor(proximity_sensor)
-        # print("visio:", sim.simxReadVisionSensor(clientID, vision_sensor, sim.simx_opmode_blocking))
-        # print("proxi:", sim.simxReadProximitySensor(clientID, proximity_sensor, sim.simx_opmode_blocking))
-        # sleep(0.1)
+    distance = read_proximity_sensor(proximity_sensor)
+    a_1 = sqrt((distance - member_5)**2 - (member_2 + member_1)**2)
+    if finish_angle > start_config[4]:
+        a_1 = - a_1
+    a = a_1 + member_4
+    gip = sqrt(a**2 + (member_1 - member_5)**2)
+    alpha = acos((member_1 - member_5)/gip)
+    betta = acos((member_2**2 + gip**2 - member_4**2)/(2*member_2*gip))
+    axis1_2_rot = pi - alpha - betta
+    axis1_2_angle = axis1_2_angle - axis1_2_rot
+    gamma = acos((member_2**2 + member_4**2 - gip**2)/(2*member_2*member_4))
+    axis2_3_rot = pi/2 - gamma
+    axis2_3_angle = axis2_3_angle - axis2_3_rot
+    if finish_angle > start_config[4]:
+        finish_angle_rot = 2*pi - alpha - betta - gamma - pi/2
+    else:
+        finish_angle_rot = 3*pi - alpha - betta - gamma - 3*pi/2
+    finish_angle = start_config[4] - finish_angle_rot
+    finish_config = [base_angle, axis1_2_angle, axis2_3_angle, axis3_4_angle, finish_angle]
+    set_joint_target_position(finish_config, joint_list)
 
     # Before closing the connection to CoppeliaSim, make sure that the last command sent out had time to arrive.
     # You can guarantee this with (for example):
