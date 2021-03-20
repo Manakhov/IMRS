@@ -37,7 +37,7 @@ if clientID != -1:
     left_handle = get_object_handle('Left_joint')
     right_handle = get_object_handle('Right_joint')
     Detection = 0.04
-    Dead_zone = 0.1
+    Dead_zone = 0.005
     Stop_time = 5
     result, start_distance = read_proximity_sensor(sensor)
     if result:
@@ -47,6 +47,8 @@ if clientID != -1:
             sim.simxSetJointTargetVelocity(clientID, right_handle, 0.005, sim.simx_opmode_oneshot)
             while result:
                 result, distance = read_proximity_sensor(sensor)
+                if distance < Dead_zone:
+                    break
             sim.simxSetJointTargetVelocity(clientID, left_handle, 0, sim.simx_opmode_oneshot)
             sim.simxSetJointTargetVelocity(clientID, right_handle, 0, sim.simx_opmode_oneshot)
             sleep(Stop_time)
