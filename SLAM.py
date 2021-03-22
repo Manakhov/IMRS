@@ -88,6 +88,8 @@ if clientID != -1:
     prev_y_right = 0
     prev_x_left = 0
     prev_y_left = 0
+    prev_vector_right = 0
+    prev_vector_left = 0
     for i in range(500):
         x, y = get_object_position(base)
         gamma = get_object_orientation(base) + pi
@@ -108,9 +110,16 @@ if clientID != -1:
             x_left = x - cos(gamma - pi/4)*(distance_left + dead_zone)
             y_left = y - sin(gamma - pi/4)*(distance_left + dead_zone)
             vector_right = sqrt((x_right - prev_x_right)**2 + (y_right - prev_y_right)**2)
+            vector_left = sqrt((x_left - prev_x_left)**2 + (y_left - prev_y_left)**2)
+            vector_right_diff = abs(vector_right - prev_vector_right)
+            vector_left_diff = abs(vector_left - prev_vector_left)
+            if vector_right_diff < 0.00001 and vector_left_diff < 0.00001:
+                motors_speed('left')
+                while distance_left < 0.3:
+                    state_left, distance_left = read_proximity_sensor(sensor_left)
+                continue
             if vector_right < 0.1:
                 position_right_array.append([x_right, y_right])
-            vector_left = sqrt((x_left - prev_x_left)**2 + (y_left - prev_y_left)**2)
             if vector_left < 0.1:
                 position_left_array.append([x_left, y_left])
             diff = distance_right - distance_left
@@ -120,6 +129,8 @@ if clientID != -1:
             prev_y_right = y_right
             prev_x_left = x_left
             prev_y_left = y_left
+            prev_vector_right = vector_right
+            prev_vector_left = vector_left
     for pos in position_array:
         x_array.append(pos[0])
         y_array.append(pos[1])
