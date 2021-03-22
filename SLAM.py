@@ -34,17 +34,30 @@ def read_proximity_sensor(sensor_handle):
     return_tuple = sim.simxReadProximitySensor(clientID, sensor_handle, sim.simx_opmode_blocking)
     return_code = return_tuple[0]
     if not return_code:
-        # detection_state = return_tuple[1]
+        detection_state = return_tuple[1]
         detected_point = return_tuple[2]
-        return detected_point[2]
+        return detection_state, detected_point[2]
 
 
 def motors_speed(added_speed):
     speed = 5
-    sim.simxSetJointTargetVelocity(clientID, motor_back_left, speed + added_speed, sim.simx_opmode_streaming)
-    sim.simxSetJointTargetVelocity(clientID, motor_back_right, speed - added_speed, sim.simx_opmode_streaming)
-    sim.simxSetJointTargetVelocity(clientID, motor_front_left, speed + added_speed, sim.simx_opmode_streaming)
-    sim.simxSetJointTargetVelocity(clientID, motor_front_right, speed - added_speed, sim.simx_opmode_streaming)
+    if added_speed == 'right':
+        speed = speed/2
+        sim.simxSetJointTargetVelocity(clientID, motor_back_left, speed, sim.simx_opmode_streaming)
+        sim.simxSetJointTargetVelocity(clientID, motor_back_right, - speed, sim.simx_opmode_streaming)
+        sim.simxSetJointTargetVelocity(clientID, motor_front_left, speed, sim.simx_opmode_streaming)
+        sim.simxSetJointTargetVelocity(clientID, motor_front_right, - speed, sim.simx_opmode_streaming)
+    elif added_speed == 'left':
+        speed = speed/2
+        sim.simxSetJointTargetVelocity(clientID, motor_back_left, - speed, sim.simx_opmode_streaming)
+        sim.simxSetJointTargetVelocity(clientID, motor_back_right, speed, sim.simx_opmode_streaming)
+        sim.simxSetJointTargetVelocity(clientID, motor_front_left, - speed, sim.simx_opmode_streaming)
+        sim.simxSetJointTargetVelocity(clientID, motor_front_right, speed, sim.simx_opmode_streaming)
+    else:
+        sim.simxSetJointTargetVelocity(clientID, motor_back_left, speed + added_speed, sim.simx_opmode_streaming)
+        sim.simxSetJointTargetVelocity(clientID, motor_back_right, speed - added_speed, sim.simx_opmode_streaming)
+        sim.simxSetJointTargetVelocity(clientID, motor_front_left, speed + added_speed, sim.simx_opmode_streaming)
+        sim.simxSetJointTargetVelocity(clientID, motor_front_right, speed - added_speed, sim.simx_opmode_streaming)
 
 
 print('Program started')
@@ -71,30 +84,42 @@ if clientID != -1:
     x_left_array = []
     y_left_array = []
     dead_zone = 0.01/(cos(pi/4))
+    prev_x_right = 0
+    prev_y_right = 0
+    prev_x_left = 0
+    prev_y_left = 0
     for i in range(500):
         x, y = get_object_position(base)
         gamma = get_object_orientation(base) + pi
-        distance_right = read_proximity_sensor(sensor_right)
-        distance_left = read_proximity_sensor(sensor_left)
+        state_right, distance_right = read_proximity_sensor(sensor_right)
+        state_left, distance_left = read_proximity_sensor(sensor_left)
         position_array.append([x, y])
-        x_right = x + cos(gamma + pi/4)*(distance_right + dead_zone)
-        y_right = y + sin(gamma + pi/4)*(distance_right + dead_zone)
-        x_left = x - cos(gamma - pi/4)*(distance_left + dead_zone)
-        y_left = y - sin(gamma - pi/4)*(distance_left + dead_zone)
-        if i > 0:
+        if not state_right:
+            motors_speed('right')
+            while not state_right:
+                state_right, distance_right = read_proximity_sensor(sensor_right)
+        elif not state_left:
+            motors_speed('left')
+            while not state_left:
+                state_left, distance_left = read_proximity_sensor(sensor_left)
+        else:
+            x_right = x + cos(gamma + pi/4)*(distance_right + dead_zone)
+            y_right = y + sin(gamma + pi/4)*(distance_right + dead_zone)
+            x_left = x - cos(gamma - pi/4)*(distance_left + dead_zone)
+            y_left = y - sin(gamma - pi/4)*(distance_left + dead_zone)
             vector_right = sqrt((x_right - prev_x_right)**2 + (y_right - prev_y_right)**2)
             if vector_right < 0.1:
                 position_right_array.append([x_right, y_right])
             vector_left = sqrt((x_left - prev_x_left)**2 + (y_left - prev_y_left)**2)
             if vector_left < 0.1:
                 position_left_array.append([x_left, y_left])
-        prev_x_right = x_right
-        prev_y_right = y_right
-        prev_x_left = x_left
-        prev_y_left = y_left
-        diff = distance_right - distance_left
-        add_speed = k_p*diff
-        motors_speed(add_speed)
+            diff = distance_right - distance_left
+            add_speed = k_p*diff
+            motors_speed(add_speed)
+            prev_x_right = x_right
+            prev_y_right = y_right
+            prev_x_left = x_left
+            prev_y_left = y_left
     for pos in position_array:
         x_array.append(pos[0])
         y_array.append(pos[1])
