@@ -27,13 +27,13 @@ def read_proximity_sensor(sensor_handle):
 
 def motors_speed(added_speed):
     speed = 5
-    if added_speed is 'right':
+    if added_speed == 'right':
         speed = speed/2
         sim.simxSetJointTargetVelocity(clientID, motor_back_left, speed, sim.simx_opmode_streaming)
         sim.simxSetJointTargetVelocity(clientID, motor_back_right, - speed, sim.simx_opmode_streaming)
         sim.simxSetJointTargetVelocity(clientID, motor_front_left, speed, sim.simx_opmode_streaming)
         sim.simxSetJointTargetVelocity(clientID, motor_front_right, - speed, sim.simx_opmode_streaming)
-    elif added_speed is 'left':
+    elif added_speed == 'left':
         speed = speed/2
         sim.simxSetJointTargetVelocity(clientID, motor_back_left, - speed, sim.simx_opmode_streaming)
         sim.simxSetJointTargetVelocity(clientID, motor_back_right, speed, sim.simx_opmode_streaming)
