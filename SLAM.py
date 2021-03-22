@@ -90,12 +90,19 @@ if clientID != -1:
     prev_y_left = 0
     prev_vector_right = 0
     prev_vector_left = 0
-    for i in range(500):
+    for i in range(1000):
         x, y = get_object_position(base)
         gamma = get_object_orientation(base) + pi
         state_right, distance_right = read_proximity_sensor(sensor_right)
         state_left, distance_left = read_proximity_sensor(sensor_left)
         position_array.append([x, y])
+        if i == 500:
+            gamma_finish = gamma + pi
+            if gamma_finish > 2*pi:
+                gamma_finish = gamma_finish - 2*pi
+            motors_speed('left')
+            while abs(gamma - gamma_finish) > 0.05:
+                gamma = get_object_orientation(base) + pi
         if not state_right:
             motors_speed('right')
             while not state_right:
