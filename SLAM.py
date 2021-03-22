@@ -64,6 +64,12 @@ if clientID != -1:
     position_array = []
     position_right_array = []
     position_left_array = []
+    x_array = []
+    y_array = []
+    x_right_array = []
+    y_right_array = []
+    x_left_array = []
+    y_left_array = []
     dead_zone = 0.01/(cos(pi/4))
     for i in range(500):
         x, y = get_object_position(base)
@@ -73,13 +79,13 @@ if clientID != -1:
         position_array.append([x, y])
         x_right = x + cos(gamma + pi/4)*(distance_right + dead_zone)
         y_right = y + sin(gamma + pi/4)*(distance_right + dead_zone)
-        x_left = x - cos(gamma - pi / 4) * (distance_left + dead_zone)
-        y_left = y - sin(gamma - pi / 4) * (distance_left + dead_zone)
+        x_left = x - cos(gamma - pi/4)*(distance_left + dead_zone)
+        y_left = y - sin(gamma - pi/4)*(distance_left + dead_zone)
         if i > 0:
             vector_right = sqrt((x_right - prev_x_right)**2 + (y_right - prev_y_right)**2)
             if vector_right < 0.1:
                 position_right_array.append([x_right, y_right])
-            vector_left = sqrt((x_left - prev_x_left) ** 2 + (y_left - prev_y_left) ** 2)
+            vector_left = sqrt((x_left - prev_x_left)**2 + (y_left - prev_y_left)**2)
             if vector_left < 0.1:
                 position_left_array.append([x_left, y_left])
         prev_x_right = x_right
@@ -89,18 +95,12 @@ if clientID != -1:
         diff = distance_right - distance_left
         add_speed = k_p*diff
         motors_speed(add_speed)
-    x_array = []
-    y_array = []
     for pos in position_array:
         x_array.append(pos[0])
         y_array.append(pos[1])
-    x_right_array = []
-    y_right_array = []
     for pos in position_right_array:
         x_right_array.append(pos[0])
         y_right_array.append(pos[1])
-    x_left_array = []
-    y_left_array = []
     for pos in position_left_array:
         x_left_array.append(pos[0])
         y_left_array.append(pos[1])
