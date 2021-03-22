@@ -64,8 +64,6 @@ if clientID != -1:
     for i in range(1000):
         state_right, distance_right = read_proximity_sensor(sensor_right)
         state_left, distance_left = read_proximity_sensor(sensor_left)
-        distance_right_diff = abs(distance_right - prev_distance_right)
-        distance_left_diff = abs(distance_left - prev_distance_left)
         if not state_right:
             motors_speed('right')
             while not state_right:
@@ -74,11 +72,14 @@ if clientID != -1:
             motors_speed('left')
             while not state_left:
                 state_left, distance_left = read_proximity_sensor(sensor_left)
-        elif distance_right_diff < 0.00001 and distance_left_diff < 0.00001:
-            motors_speed('left')
-            while distance_left < 0.3:
-                state_left, distance_left = read_proximity_sensor(sensor_left)
         else:
+            distance_right_diff = abs(distance_right - prev_distance_right)
+            distance_left_diff = abs(distance_left - prev_distance_left)
+            if distance_right_diff < 0.00001 and distance_left_diff < 0.00001:
+                motors_speed('left')
+                while distance_left < 0.3:
+                    state_left, distance_left = read_proximity_sensor(sensor_left)
+                continue
             diff = distance_right - distance_left
             add_speed = k_p*diff
             motors_speed(add_speed)
