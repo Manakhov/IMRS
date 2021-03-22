@@ -20,17 +20,30 @@ def read_proximity_sensor(sensor_handle):
     return_tuple = sim.simxReadProximitySensor(clientID, sensor_handle, sim.simx_opmode_blocking)
     return_code = return_tuple[0]
     if not return_code:
-        # detection_state = return_tuple[1]
+        detection_state = return_tuple[1]
         detected_point = return_tuple[2]
-        return detected_point[2]
+        return detection_state, detected_point[2]
 
 
 def motors_speed(added_speed):
     speed = 5
-    sim.simxSetJointTargetVelocity(clientID, motor_back_left, speed + added_speed, sim.simx_opmode_streaming)
-    sim.simxSetJointTargetVelocity(clientID, motor_back_right, speed - added_speed, sim.simx_opmode_streaming)
-    sim.simxSetJointTargetVelocity(clientID, motor_front_left, speed + added_speed, sim.simx_opmode_streaming)
-    sim.simxSetJointTargetVelocity(clientID, motor_front_right, speed - added_speed, sim.simx_opmode_streaming)
+    if added_speed == 'right':
+        speed = speed/2
+        sim.simxSetJointTargetVelocity(clientID, motor_back_left, speed, sim.simx_opmode_streaming)
+        sim.simxSetJointTargetVelocity(clientID, motor_back_right, - speed, sim.simx_opmode_streaming)
+        sim.simxSetJointTargetVelocity(clientID, motor_front_left, speed, sim.simx_opmode_streaming)
+        sim.simxSetJointTargetVelocity(clientID, motor_front_right, - speed, sim.simx_opmode_streaming)
+    elif added_speed == 'left':
+        speed = speed/2
+        sim.simxSetJointTargetVelocity(clientID, motor_back_left, - speed, sim.simx_opmode_streaming)
+        sim.simxSetJointTargetVelocity(clientID, motor_back_right, speed, sim.simx_opmode_streaming)
+        sim.simxSetJointTargetVelocity(clientID, motor_front_left, - speed, sim.simx_opmode_streaming)
+        sim.simxSetJointTargetVelocity(clientID, motor_front_right, speed, sim.simx_opmode_streaming)
+    else:
+        sim.simxSetJointTargetVelocity(clientID, motor_back_left, speed + added_speed, sim.simx_opmode_streaming)
+        sim.simxSetJointTargetVelocity(clientID, motor_back_right, speed - added_speed, sim.simx_opmode_streaming)
+        sim.simxSetJointTargetVelocity(clientID, motor_front_left, speed + added_speed, sim.simx_opmode_streaming)
+        sim.simxSetJointTargetVelocity(clientID, motor_front_right, speed - added_speed, sim.simx_opmode_streaming)
 
 
 print('Program started')
@@ -45,18 +58,22 @@ if clientID != -1:
     motor_front_right = get_object_handle('FR_joint')
     sensor_right = get_object_handle('FR_sensor')
     sensor_left = get_object_handle('FL_sensor')
-    base = get_object_handle('Base')
     k_p = 8
-    k_d = 10
-    prev_diff = 0
     for i in range(1000):
-        distance_right = read_proximity_sensor(sensor_right)
-        distance_left = read_proximity_sensor(sensor_left)
-        diff = distance_right - distance_left
-        diff_d = diff - prev_diff
-        add_speed = k_p*diff
-        motors_speed(add_speed)
-        prev_diff = diff
+        state_right, distance_right = read_proximity_sensor(sensor_right)
+        state_left, distance_left = read_proximity_sensor(sensor_left)
+        if not state_right:
+            motors_speed('right')
+            while not state_right:
+                state_right, distance_right = read_proximity_sensor(sensor_right)
+        elif not state_left:
+            motors_speed('left')
+            while not state_left:
+                state_left, distance_left = read_proximity_sensor(sensor_left)
+        else:
+            diff = distance_right - distance_left
+            add_speed = k_p*diff
+            motors_speed(add_speed)
 
     # Before closing the connection to CoppeliaSim, make sure that the last command sent out had time to arrive.
     # You can guarantee this with (for example):
