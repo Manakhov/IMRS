@@ -53,6 +53,11 @@ def motors_speed(added_speed):
         sim.simxSetJointTargetVelocity(clientID, motor_back_right, speed, sim.simx_opmode_streaming)
         sim.simxSetJointTargetVelocity(clientID, motor_front_left, - speed, sim.simx_opmode_streaming)
         sim.simxSetJointTargetVelocity(clientID, motor_front_right, speed, sim.simx_opmode_streaming)
+    elif added_speed == 'stop':
+        sim.simxSetJointTargetVelocity(clientID, motor_back_left, 0, sim.simx_opmode_streaming)
+        sim.simxSetJointTargetVelocity(clientID, motor_back_right, 0, sim.simx_opmode_streaming)
+        sim.simxSetJointTargetVelocity(clientID, motor_front_left, 0, sim.simx_opmode_streaming)
+        sim.simxSetJointTargetVelocity(clientID, motor_front_right, 0, sim.simx_opmode_streaming)
     else:
         sim.simxSetJointTargetVelocity(clientID, motor_back_left, speed + added_speed, sim.simx_opmode_streaming)
         sim.simxSetJointTargetVelocity(clientID, motor_back_right, speed - added_speed, sim.simx_opmode_streaming)
@@ -138,6 +143,7 @@ if clientID != -1:
             prev_y_left = y_left
             prev_vector_right = vector_right
             prev_vector_left = vector_left
+    motors_speed('stop')
     for pos in position_array:
         x_array.append(pos[0])
         y_array.append(pos[1])
