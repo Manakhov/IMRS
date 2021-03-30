@@ -71,6 +71,15 @@ def motors_speed(added_speed):
         sim.simxSetJointTargetVelocity(clientID, motor_front_right, speed - added_speed, sim.simx_opmode_streaming)
 
 
+def angle_step(angle_now, angle_prev):
+    step = angle_now - angle_prev
+    if step > pi:
+        step = angle_now - 2*pi - angle_prev
+    elif step < -pi:
+        step = angle_now + 2*pi - angle_prev
+    return step
+
+
 print('Program started')
 sim.simxFinish(-1)  # just in case, close all opened connections
 clientID = sim.simxStart('127.0.0.1', 19999, True, True, 5000, 5)  # Connect to CoppeliaSim
@@ -88,21 +97,22 @@ if clientID != -1:
     way = 0
     angle = 0
     motors_speed(0)
-    x_prev, y_prev = get_object_position(base)
+    x_start, y_start = get_object_position(base)
+    y_prev = y_start
     position_right_prev = get_joint_position(motor_front_right) + pi
     while way < distance:
         x_now, y_now = get_object_position(base)
         position_right = get_joint_position(motor_front_right) + pi
         y_step = abs(y_now - y_prev)
-        right_step = abs(position_right - position_right_prev)
-        if right_step > pi:
-            right_step = abs(position_right + 2*pi - position_right_prev)
+        right_step = angle_step(position_right, position_right_prev)
         way = way + y_step
         angle = angle + right_step
         y_prev = y_now
         position_right_prev = position_right
     motors_speed('stop')
-    k_pos = way / angle  # position quotient (m/rad)
+    x_finish, y_finish = get_object_position(base)
+    real_way = abs(y_finish - y_start)
+    k_pos = real_way/angle  # position quotient (m/rad)
     print('k_pos = ', k_pos)
 
     # Before closing the connection to CoppeliaSim, make sure that the last command sent out had time to arrive.
