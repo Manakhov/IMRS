@@ -1,5 +1,4 @@
-from matplotlib.pyplot import plot, show, scatter
-from math import sin, cos, pi, sqrt
+from math import pi
 try:
     import sim
 except:
@@ -34,15 +33,6 @@ def get_object_position(object_handle):
     return_code, position = sim.simxGetObjectPosition(clientID, object_handle, -1, sim.simx_opmode_blocking)
     if not return_code:
         return position[:2]
-
-
-def read_proximity_sensor(sensor_handle):
-    return_tuple = sim.simxReadProximitySensor(clientID, sensor_handle, sim.simx_opmode_blocking)
-    return_code = return_tuple[0]
-    if not return_code:
-        detection_state = return_tuple[1]
-        detected_point = return_tuple[2]
-        return detection_state, detected_point[2]
 
 
 def motors_speed(added_speed):
@@ -90,8 +80,6 @@ if clientID != -1:
     motor_back_right = get_object_handle('BR_joint')
     motor_front_left = get_object_handle('FL_joint')
     motor_front_right = get_object_handle('FR_joint')
-    sensor_right = get_object_handle('FR_sensor')
-    sensor_left = get_object_handle('FL_sensor')
     base = get_object_handle('Base')
     distance = 1
     way = 0
