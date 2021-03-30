@@ -96,6 +96,9 @@ if clientID != -1:
     distance = 1
     way = 0
     angle = 0
+    rotation = 5*pi/2
+    base_rotation = 0
+    diff_angle = 0
     motors_speed(0)
     x_start, y_start = get_object_position(base)
     y_prev = y_start
@@ -112,8 +115,40 @@ if clientID != -1:
     motors_speed('stop')
     x_finish, y_finish = get_object_position(base)
     real_way = abs(y_finish - y_start)
+    position_right = get_joint_position(motor_front_right) + pi
+    right_step = angle_step(position_right, position_right_prev)
+    angle = angle + right_step
     k_pos = real_way/angle  # position quotient (m/rad)
     print('k_pos = ', k_pos)
+    motors_speed('left')
+    base_orientation_start = get_object_orientation(base) + pi
+    base_orientation_prev = base_orientation_start
+    position_right_prev = get_joint_position(motor_front_right) + pi
+    position_left_prev = get_joint_position(motor_front_left) + pi
+    while base_rotation < rotation:
+        base_orientation = get_object_orientation(base) + pi
+        position_right = get_joint_position(motor_front_right) + pi
+        position_left = get_joint_position(motor_front_left) + pi
+        base_step = angle_step(base_orientation, base_orientation_prev)
+        right_step = angle_step(position_right, position_right_prev)
+        left_step = angle_step(position_left, position_left_prev)
+        diff_step = right_step - left_step
+        base_rotation = base_rotation + base_step
+        diff_angle = diff_angle + diff_step
+        base_orientation_prev = base_orientation
+        position_right_prev = position_right
+        position_left_prev = position_left
+    motors_speed('stop')
+    base_orientation_finish = get_object_orientation(base) + pi
+    real_rotation = base_orientation_finish + 2 * pi - base_orientation_start
+    position_right = get_joint_position(motor_front_right) + pi
+    position_left = get_joint_position(motor_front_left) + pi
+    right_step = angle_step(position_right, position_right_prev)
+    left_step = angle_step(position_left, position_left_prev)
+    diff_step = right_step - left_step
+    diff_angle = diff_angle + diff_step
+    k_ori = real_rotation/diff_angle  # orientation quotient (rad/rad)
+    print('k_ori = ', k_ori)
 
     # Before closing the connection to CoppeliaSim, make sure that the last command sent out had time to arrive.
     # You can guarantee this with (for example):
