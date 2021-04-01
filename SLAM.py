@@ -18,16 +18,10 @@ def get_object_handle(object_name):
         return handle
 
 
-def get_object_orientation(object_name):
-    return_code, euler_angles = sim.simxGetObjectOrientation(clientID, object_name, -1, sim.simx_opmode_blocking)
+def get_joint_position(joint_handle):
+    return_code, position = sim.simxGetJointPosition(clientID, joint_handle, sim.simx_opmode_blocking)
     if not return_code:
-        return euler_angles[2]
-
-
-def get_object_position(object_handle):
-    return_code, position = sim.simxGetObjectPosition(clientID, object_handle, -1, sim.simx_opmode_blocking)
-    if not return_code:
-        return position[:2]
+        return position
 
 
 def read_proximity_sensor(sensor_handle):
@@ -35,8 +29,10 @@ def read_proximity_sensor(sensor_handle):
     return_code = return_tuple[0]
     if not return_code:
         detection_state = return_tuple[1]
-        detected_point = return_tuple[2]
-        return detection_state, detected_point[2]
+        detected_distance = return_tuple[2][2]
+        if not detection_state or detected_distance < 0:
+            detected_distance = None
+        return detected_distance
 
 
 def motors_speed(added_speed):
@@ -65,6 +61,15 @@ def motors_speed(added_speed):
         sim.simxSetJointTargetVelocity(clientID, motor_front_right, speed - added_speed, sim.simx_opmode_streaming)
 
 
+def angle_step(angle_now, angle_prev):
+    step = angle_now - angle_prev
+    if step > pi:
+        step = angle_now - 2*pi - angle_prev
+    elif step < -pi:
+        step = angle_now + 2*pi - angle_prev
+    return step
+
+
 print('Program started')
 sim.simxFinish(-1)  # just in case, close all opened connections
 clientID = sim.simxStart('127.0.0.1', 19999, True, True, 5000, 5)  # Connect to CoppeliaSim
@@ -78,85 +83,31 @@ if clientID != -1:
     sensor_right = get_object_handle('FR_sensor')
     sensor_left = get_object_handle('FL_sensor')
     base = get_object_handle('Base')
-    k_p = 9
-    position_array = []
-    position_right_array = []
-    position_left_array = []
-    x_array = []
-    y_array = []
-    x_right_array = []
-    y_right_array = []
-    x_left_array = []
-    y_left_array = []
-    dead_zone = 0.01/(cos(pi/4))
-    prev_x_right = 0
-    prev_y_right = 0
-    prev_x_left = 0
-    prev_y_left = 0
-    prev_vector_right = 0
-    prev_vector_left = 0
-    for i in range(1000):
-        x, y = get_object_position(base)
-        gamma = get_object_orientation(base) + pi
-        state_right, distance_right = read_proximity_sensor(sensor_right)
-        state_left, distance_left = read_proximity_sensor(sensor_left)
-        position_array.append([x, y])
-        if i == 500:
-            gamma_finish = gamma + pi
-            if gamma_finish > 2*pi:
-                gamma_finish = gamma_finish - 2*pi
-            motors_speed('left')
-            while abs(gamma - gamma_finish) > 0.05:
-                gamma = get_object_orientation(base) + pi
-        if not state_right:
+    k_p = 8
+    list_position_right = []
+    list_position_left = []
+    list_distance_right = []
+    list_distance_left = []
+    for i in range(500):
+        position_right = get_joint_position(motor_front_right) + pi
+        position_left = get_joint_position(motor_front_left) + pi
+        distance_right = read_proximity_sensor(sensor_right)
+        distance_left = read_proximity_sensor(sensor_left)
+        list_position_right.append(position_right)
+        list_position_left.append(position_left)
+        list_distance_right.append(distance_right)
+        list_distance_left.append(distance_left)
+        if distance_right is None:
             motors_speed('right')
-            while not state_right:
-                state_right, distance_right = read_proximity_sensor(sensor_right)
-        elif not state_left:
+        elif distance_left is None:
             motors_speed('left')
-            while not state_left:
-                state_left, distance_left = read_proximity_sensor(sensor_left)
         else:
-            x_right = x + cos(gamma + pi/4)*(distance_right + dead_zone)
-            y_right = y + sin(gamma + pi/4)*(distance_right + dead_zone)
-            x_left = x - cos(gamma - pi/4)*(distance_left + dead_zone)
-            y_left = y - sin(gamma - pi/4)*(distance_left + dead_zone)
-            vector_right = sqrt((x_right - prev_x_right)**2 + (y_right - prev_y_right)**2)
-            vector_left = sqrt((x_left - prev_x_left)**2 + (y_left - prev_y_left)**2)
-            vector_right_diff = abs(vector_right - prev_vector_right)
-            vector_left_diff = abs(vector_left - prev_vector_left)
-            if vector_right_diff < 0.00001 and vector_left_diff < 0.00001:
-                motors_speed('left')
-                while distance_left < 0.3:
-                    state_left, distance_left = read_proximity_sensor(sensor_left)
-                continue
-            if vector_right < 0.1:
-                position_right_array.append([x_right, y_right])
-            if vector_left < 0.1:
-                position_left_array.append([x_left, y_left])
             diff = distance_right - distance_left
             add_speed = k_p*diff
             motors_speed(add_speed)
-            prev_x_right = x_right
-            prev_y_right = y_right
-            prev_x_left = x_left
-            prev_y_left = y_left
-            prev_vector_right = vector_right
-            prev_vector_left = vector_left
     motors_speed('stop')
-    for pos in position_array:
-        x_array.append(pos[0])
-        y_array.append(pos[1])
-    for pos in position_right_array:
-        x_right_array.append(pos[0])
-        y_right_array.append(pos[1])
-    for pos in position_left_array:
-        x_left_array.append(pos[0])
-        y_left_array.append(pos[1])
-    plot(x_array, y_array)
-    scatter(x_right_array, y_right_array)
-    scatter(x_left_array, y_left_array)
-    show()
+    for i in range(len(list_position_right)):
+        print(list_position_right[i], list_position_left[i], list_distance_right[i], list_distance_left[i])
 
     # Before closing the connection to CoppeliaSim, make sure that the last command sent out had time to arrive.
     # You can guarantee this with (for example):
