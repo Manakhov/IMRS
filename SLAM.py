@@ -83,12 +83,24 @@ if clientID != -1:
     sensor_right = get_object_handle('FR_sensor')
     sensor_left = get_object_handle('FL_sensor')
     base = get_object_handle('Base')
-    k_p = 8
+    iteration = 500
+    k_p = 7
+    k_pos = 0.02009
+    k_ori = 0.16607
+    orientation_prev = 0
+    x_prev = 0
+    y_prev = 0
+    list_x = []
+    list_y = []
+    list_x_right = []
+    list_y_right = []
+    list_x_left = []
+    list_y_left = []
     list_position_right = []
     list_position_left = []
     list_distance_right = []
     list_distance_left = []
-    for i in range(500):
+    for i in range(iteration):
         position_right = get_joint_position(motor_front_right) + pi
         position_left = get_joint_position(motor_front_left) + pi
         distance_right = read_proximity_sensor(sensor_right)
@@ -97,6 +109,12 @@ if clientID != -1:
         list_position_left.append(position_left)
         list_distance_right.append(distance_right)
         list_distance_left.append(distance_left)
+        # right_step = angle_step(list_position_right[i], list_position_right[i - 1])
+        # left_step = angle_step(list_position_left[i], list_position_left[i - 1])
+        # diff_step = left_step - right_step
+        # orientation_now = orientation_prev - k_ori * diff_step
+        # print(orientation_now)
+        # orientation_prev = orientation_now
         if distance_right is None:
             motors_speed('right')
         elif distance_left is None:
@@ -106,8 +124,40 @@ if clientID != -1:
             add_speed = k_p*diff
             motors_speed(add_speed)
     motors_speed('stop')
-    for i in range(len(list_position_right)):
-        print(list_position_right[i], list_position_left[i], list_distance_right[i], list_distance_left[i])
+    for i in range(iteration):
+        if i == 0:
+            list_x.append(x_prev)
+            list_y.append(y_prev)
+            continue
+        # print(i, list_position_right[i], list_position_left[i], list_distance_right[i], list_distance_left[i])
+        right_step = angle_step(list_position_right[i], list_position_right[i-1])
+        left_step = angle_step(list_position_left[i], list_position_left[i-1])
+        diff_step = left_step - right_step
+        orientation_now = orientation_prev - k_ori*diff_step
+        # print(orientation_now)
+        x_step = right_step * sin(orientation_now) * k_pos
+        y_step = right_step * cos(orientation_now) * k_pos
+        x_now = x_prev - x_step
+        y_now = y_prev + y_step
+        list_x.append(x_now)
+        list_y.append(y_now)
+        if list_distance_right[i] is not None:
+            x_right = x_now + cos(orientation_now + pi/4)*(list_distance_right[i])
+            y_right = y_now + sin(orientation_now + pi/4)*(list_distance_right[i])
+            list_x_right.append(x_right)
+            list_y_right.append(y_right)
+        if list_distance_left[i] is not None:
+            x_left = x_now - cos(orientation_now - pi/4)*(list_distance_left[i])
+            y_left = y_now - sin(orientation_now - pi/4)*(list_distance_left[i])
+            list_x_left.append(x_left)
+            list_y_left.append(y_left)
+        orientation_prev = orientation_now
+        x_prev = x_now
+        y_prev = y_now
+    plot(list_x, list_y)
+    scatter(list_x_right, list_y_right)
+    scatter(list_x_left, list_y_left)
+    show()
 
     # Before closing the connection to CoppeliaSim, make sure that the last command sent out had time to arrive.
     # You can guarantee this with (for example):
