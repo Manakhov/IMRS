@@ -87,6 +87,8 @@ if clientID != -1:
     k_p = 7
     k_pos = 0.02009
     k_ori = 0.16607
+    dead_zone = 0.01/(cos(pi/4))
+    motor_position = 0.06
     orientation_prev = 0
     x_prev = 0
     y_prev = 0
@@ -109,12 +111,6 @@ if clientID != -1:
         list_position_left.append(position_left)
         list_distance_right.append(distance_right)
         list_distance_left.append(distance_left)
-        # right_step = angle_step(list_position_right[i], list_position_right[i - 1])
-        # left_step = angle_step(list_position_left[i], list_position_left[i - 1])
-        # diff_step = left_step - right_step
-        # orientation_now = orientation_prev - k_ori * diff_step
-        # print(orientation_now)
-        # orientation_prev = orientation_now
         if distance_right is None:
             motors_speed('right')
         elif distance_left is None:
@@ -135,20 +131,20 @@ if clientID != -1:
         diff_step = left_step - right_step
         orientation_now = orientation_prev - k_ori*diff_step
         # print(orientation_now)
-        x_step = right_step * sin(orientation_now) * k_pos
-        y_step = right_step * cos(orientation_now) * k_pos
+        x_step = right_step*sin(orientation_now)*k_pos + motor_position*(-cos(orientation_prev) + cos(orientation_now))
+        y_step = right_step*cos(orientation_now)*k_pos + motor_position*(sin(orientation_prev) - sin(orientation_now))
         x_now = x_prev - x_step
         y_now = y_prev + y_step
         list_x.append(x_now)
         list_y.append(y_now)
         if list_distance_right[i] is not None:
-            x_right = x_now + cos(orientation_now + pi/4)*(list_distance_right[i])
-            y_right = y_now + sin(orientation_now + pi/4)*(list_distance_right[i])
+            x_right = x_now + cos(orientation_now + pi/4)*(list_distance_right[i] + dead_zone)
+            y_right = y_now + sin(orientation_now + pi/4)*(list_distance_right[i] + dead_zone)
             list_x_right.append(x_right)
             list_y_right.append(y_right)
         if list_distance_left[i] is not None:
-            x_left = x_now - cos(orientation_now - pi/4)*(list_distance_left[i])
-            y_left = y_now - sin(orientation_now - pi/4)*(list_distance_left[i])
+            x_left = x_now - cos(orientation_now - pi/4)*(list_distance_left[i] + dead_zone)
+            y_left = y_now - sin(orientation_now - pi/4)*(list_distance_left[i] + dead_zone)
             list_x_left.append(x_left)
             list_y_left.append(y_left)
         orientation_prev = orientation_now
