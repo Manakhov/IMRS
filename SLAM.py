@@ -131,8 +131,23 @@ if clientID != -1:
         diff_step = left_step - right_step
         orientation_now = orientation_prev - k_ori*diff_step
         # print(orientation_now)
-        x_step = right_step*sin(orientation_now)*k_pos + motor_position*(-cos(orientation_prev) + cos(orientation_now))
-        y_step = right_step*cos(orientation_now)*k_pos + motor_position*(sin(orientation_prev) - sin(orientation_now))
+        x_right_step = right_step*sin(orientation_now)*k_pos + motor_position*(-cos(orientation_prev) + cos(orientation_now))
+        y_right_step = right_step*cos(orientation_now)*k_pos + motor_position*(sin(orientation_prev) - sin(orientation_now))
+        x_left_step = left_step*sin(orientation_now)*k_pos - motor_position*(-cos(orientation_prev) + cos(orientation_now))
+        y_left_step = left_step*cos(orientation_now)*k_pos - motor_position*(sin(orientation_prev) - sin(orientation_now))
+        x_step = (x_right_step + x_left_step)/2
+        y_step = (y_right_step + y_left_step)/2
+        vector_step = sqrt(x_step**2 + y_step**2)
+        if vector_step > 0.0205:
+            vector_right_step = sqrt(x_right_step**2 + y_right_step**2)
+            vector_left_step = sqrt(x_left_step**2 + y_left_step**2)
+            if vector_right_step < vector_left_step:
+                x_step = x_right_step
+                y_step = y_right_step
+            else:
+                x_step = x_left_step
+                y_step = y_left_step
+        # print(sqrt(x_step**2 + y_step**2))
         x_now = x_prev - x_step
         y_now = y_prev + y_step
         list_x.append(x_now)
