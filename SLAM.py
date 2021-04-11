@@ -1,5 +1,5 @@
 from matplotlib.pyplot import plot, show, scatter
-from math import sin, cos, pi, sqrt
+from math import sin, cos, pi
 try:
     import sim
 except:
@@ -18,16 +18,10 @@ def get_object_handle(object_name):
         return handle
 
 
-def get_object_orientation(object_name):
-    return_code, euler_angles = sim.simxGetObjectOrientation(clientID, object_name, -1, sim.simx_opmode_blocking)
+def get_joint_position(joint_handle):
+    return_code, position = sim.simxGetJointPosition(clientID, joint_handle, sim.simx_opmode_blocking)
     if not return_code:
-        return euler_angles[2]
-
-
-def get_object_position(object_handle):
-    return_code, position = sim.simxGetObjectPosition(clientID, object_handle, -1, sim.simx_opmode_blocking)
-    if not return_code:
-        return position[:2]
+        return position
 
 
 def read_proximity_sensor(sensor_handle):
@@ -35,20 +29,22 @@ def read_proximity_sensor(sensor_handle):
     return_code = return_tuple[0]
     if not return_code:
         detection_state = return_tuple[1]
-        detected_point = return_tuple[2]
-        return detection_state, detected_point[2]
+        detected_distance = return_tuple[2][2]
+        if not detection_state or detected_distance < 0:
+            detected_distance = None
+        return detected_distance
 
 
 def motors_speed(added_speed):
     speed = 5
     if added_speed == 'right':
-        speed = speed/2
+        speed = speed/5
         sim.simxSetJointTargetVelocity(clientID, motor_back_left, speed, sim.simx_opmode_streaming)
         sim.simxSetJointTargetVelocity(clientID, motor_back_right, - speed, sim.simx_opmode_streaming)
         sim.simxSetJointTargetVelocity(clientID, motor_front_left, speed, sim.simx_opmode_streaming)
         sim.simxSetJointTargetVelocity(clientID, motor_front_right, - speed, sim.simx_opmode_streaming)
     elif added_speed == 'left':
-        speed = speed/2
+        speed = speed/5
         sim.simxSetJointTargetVelocity(clientID, motor_back_left, - speed, sim.simx_opmode_streaming)
         sim.simxSetJointTargetVelocity(clientID, motor_back_right, speed, sim.simx_opmode_streaming)
         sim.simxSetJointTargetVelocity(clientID, motor_front_left, - speed, sim.simx_opmode_streaming)
@@ -65,6 +61,15 @@ def motors_speed(added_speed):
         sim.simxSetJointTargetVelocity(clientID, motor_front_right, speed - added_speed, sim.simx_opmode_streaming)
 
 
+def angle_step(angle_now, angle_prev):
+    step = angle_now - angle_prev
+    if step > pi:
+        step = angle_now - 2*pi - angle_prev
+    elif step < -pi:
+        step = angle_now + 2*pi - angle_prev
+    return step
+
+
 print('Program started')
 sim.simxFinish(-1)  # just in case, close all opened connections
 clientID = sim.simxStart('127.0.0.1', 19999, True, True, 5000, 5)  # Connect to CoppeliaSim
@@ -78,84 +83,100 @@ if clientID != -1:
     sensor_right = get_object_handle('FR_sensor')
     sensor_left = get_object_handle('FL_sensor')
     base = get_object_handle('Base')
-    k_p = 9
-    position_array = []
-    position_right_array = []
-    position_left_array = []
-    x_array = []
-    y_array = []
-    x_right_array = []
-    y_right_array = []
-    x_left_array = []
-    y_left_array = []
+    iteration = 1200
+    k_p = 7
+    k_pos = 0.02007
+    k_ori = 0.15367
     dead_zone = 0.01/(cos(pi/4))
-    prev_x_right = 0
-    prev_y_right = 0
-    prev_x_left = 0
-    prev_y_left = 0
-    prev_vector_right = 0
-    prev_vector_left = 0
-    for i in range(1000):
-        x, y = get_object_position(base)
-        gamma = get_object_orientation(base) + pi
-        state_right, distance_right = read_proximity_sensor(sensor_right)
-        state_left, distance_left = read_proximity_sensor(sensor_left)
-        position_array.append([x, y])
-        if i == 500:
-            gamma_finish = gamma + pi
-            if gamma_finish > 2*pi:
-                gamma_finish = gamma_finish - 2*pi
+    motor_position = 0.06
+    distance_min = 0.1
+    rotation_state = False
+    rotation_state_right = False
+    rotation_state_left = False
+    rotation_finish = 0
+    orientation_prev = 0
+    x_prev = 0
+    y_prev = 0
+    list_x = []
+    list_y = []
+    list_x_sensor = []
+    list_y_sensor = []
+    list_position_right = []
+    list_position_left = []
+    list_distance_right = []
+    list_distance_left = []
+    for i in range(iteration):
+        position_right = get_joint_position(motor_front_right) + pi
+        position_left = get_joint_position(motor_front_left) + pi
+        distance_right = read_proximity_sensor(sensor_right)
+        distance_left = read_proximity_sensor(sensor_left)
+        list_position_right.append(position_right)
+        list_position_left.append(position_left)
+        list_distance_right.append(distance_right)
+        list_distance_left.append(distance_left)
+        if rotation_state and i < rotation_finish:
+            continue
+        elif i == iteration/2:
             motors_speed('left')
-            while abs(gamma - gamma_finish) > 0.05:
-                gamma = get_object_orientation(base) + pi
-        if not state_right:
+            rotation_finish = i + 75
+            rotation_state = True
+        elif distance_right is None:
             motors_speed('right')
-            while not state_right:
-                state_right, distance_right = read_proximity_sensor(sensor_right)
-        elif not state_left:
+        elif distance_left is None:
             motors_speed('left')
-            while not state_left:
-                state_left, distance_left = read_proximity_sensor(sensor_left)
+        elif rotation_state_right:
+            if distance_left > 2*distance_min:
+                rotation_state_right = False
+            continue
+        elif rotation_state_left:
+            if distance_right > 2*distance_min:
+                rotation_state_left = False
+            continue
+        elif distance_left < distance_min:
+            motors_speed('right')
+            rotation_state_right = True
+        elif distance_right < distance_min:
+            motors_speed('left')
+            rotation_state_left = True
         else:
-            x_right = x + cos(gamma + pi/4)*(distance_right + dead_zone)
-            y_right = y + sin(gamma + pi/4)*(distance_right + dead_zone)
-            x_left = x - cos(gamma - pi/4)*(distance_left + dead_zone)
-            y_left = y - sin(gamma - pi/4)*(distance_left + dead_zone)
-            vector_right = sqrt((x_right - prev_x_right)**2 + (y_right - prev_y_right)**2)
-            vector_left = sqrt((x_left - prev_x_left)**2 + (y_left - prev_y_left)**2)
-            vector_right_diff = abs(vector_right - prev_vector_right)
-            vector_left_diff = abs(vector_left - prev_vector_left)
-            if vector_right_diff < 0.00001 and vector_left_diff < 0.00001:
-                motors_speed('left')
-                while distance_left < 0.3:
-                    state_left, distance_left = read_proximity_sensor(sensor_left)
-                continue
-            if vector_right < 0.1:
-                position_right_array.append([x_right, y_right])
-            if vector_left < 0.1:
-                position_left_array.append([x_left, y_left])
             diff = distance_right - distance_left
             add_speed = k_p*diff
             motors_speed(add_speed)
-            prev_x_right = x_right
-            prev_y_right = y_right
-            prev_x_left = x_left
-            prev_y_left = y_left
-            prev_vector_right = vector_right
-            prev_vector_left = vector_left
     motors_speed('stop')
-    for pos in position_array:
-        x_array.append(pos[0])
-        y_array.append(pos[1])
-    for pos in position_right_array:
-        x_right_array.append(pos[0])
-        y_right_array.append(pos[1])
-    for pos in position_left_array:
-        x_left_array.append(pos[0])
-        y_left_array.append(pos[1])
-    plot(x_array, y_array)
-    scatter(x_right_array, y_right_array)
-    scatter(x_left_array, y_left_array)
+    for i in range(iteration):
+        if i == 0:
+            list_x.append(x_prev)
+            list_y.append(y_prev)
+            continue
+        right_step = angle_step(list_position_right[i], list_position_right[i-1])
+        left_step = angle_step(list_position_left[i], list_position_left[i-1])
+        diff_step = left_step - right_step
+        orientation_now = orientation_prev - k_ori*diff_step
+        x_right_step = right_step*sin(orientation_now)*k_pos + motor_position*(-cos(orientation_prev) + cos(orientation_now))
+        y_right_step = right_step*cos(orientation_now)*k_pos + motor_position*(sin(orientation_prev) - sin(orientation_now))
+        x_left_step = left_step*sin(orientation_now)*k_pos - motor_position*(-cos(orientation_prev) + cos(orientation_now))
+        y_left_step = left_step*cos(orientation_now)*k_pos - motor_position*(sin(orientation_prev) - sin(orientation_now))
+        x_step = (x_right_step + x_left_step)/2
+        y_step = (y_right_step + y_left_step)/2
+        x_now = x_prev - x_step
+        y_now = y_prev + y_step
+        list_x.append(x_now)
+        list_y.append(y_now)
+        if list_distance_right[i] is not None:
+            x_right = x_now + cos(orientation_now + pi/4)*(list_distance_right[i] + dead_zone)
+            y_right = y_now + sin(orientation_now + pi/4)*(list_distance_right[i] + dead_zone)
+            list_x_sensor.append(x_right)
+            list_y_sensor.append(y_right)
+        if list_distance_left[i] is not None:
+            x_left = x_now - cos(orientation_now - pi/4)*(list_distance_left[i] + dead_zone)
+            y_left = y_now - sin(orientation_now - pi/4)*(list_distance_left[i] + dead_zone)
+            list_x_sensor.append(x_left)
+            list_y_sensor.append(y_left)
+        orientation_prev = orientation_now
+        x_prev = x_now
+        y_prev = y_now
+    plot(list_x, list_y)
+    scatter(list_x_sensor, list_y_sensor)
     show()
 
     # Before closing the connection to CoppeliaSim, make sure that the last command sent out had time to arrive.
