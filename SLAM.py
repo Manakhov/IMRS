@@ -1,5 +1,5 @@
 from matplotlib.pyplot import plot, show, scatter
-from math import sin, cos, pi, sqrt
+from math import sin, cos, pi
 try:
     import sim
 except:
@@ -38,13 +38,13 @@ def read_proximity_sensor(sensor_handle):
 def motors_speed(added_speed):
     speed = 5
     if added_speed == 'right':
-        speed = speed/2
+        speed = speed/5
         sim.simxSetJointTargetVelocity(clientID, motor_back_left, speed, sim.simx_opmode_streaming)
         sim.simxSetJointTargetVelocity(clientID, motor_back_right, - speed, sim.simx_opmode_streaming)
         sim.simxSetJointTargetVelocity(clientID, motor_front_left, speed, sim.simx_opmode_streaming)
         sim.simxSetJointTargetVelocity(clientID, motor_front_right, - speed, sim.simx_opmode_streaming)
     elif added_speed == 'left':
-        speed = speed/2
+        speed = speed/5
         sim.simxSetJointTargetVelocity(clientID, motor_back_left, - speed, sim.simx_opmode_streaming)
         sim.simxSetJointTargetVelocity(clientID, motor_back_right, speed, sim.simx_opmode_streaming)
         sim.simxSetJointTargetVelocity(clientID, motor_front_left, - speed, sim.simx_opmode_streaming)
@@ -83,21 +83,24 @@ if clientID != -1:
     sensor_right = get_object_handle('FR_sensor')
     sensor_left = get_object_handle('FL_sensor')
     base = get_object_handle('Base')
-    iteration = 500
+    iteration = 1200
     k_p = 7
-    k_pos = 0.02009
-    k_ori = 0.16607
+    k_pos = 0.02007
+    k_ori = 0.15367
     dead_zone = 0.01/(cos(pi/4))
     motor_position = 0.06
+    distance_min = 0.1
+    rotation_state = False
+    rotation_state_right = False
+    rotation_state_left = False
+    rotation_finish = 0
     orientation_prev = 0
     x_prev = 0
     y_prev = 0
     list_x = []
     list_y = []
-    list_x_right = []
-    list_y_right = []
-    list_x_left = []
-    list_y_left = []
+    list_x_sensor = []
+    list_y_sensor = []
     list_position_right = []
     list_position_left = []
     list_distance_right = []
@@ -111,10 +114,30 @@ if clientID != -1:
         list_position_left.append(position_left)
         list_distance_right.append(distance_right)
         list_distance_left.append(distance_left)
-        if distance_right is None:
+        if rotation_state and i < rotation_finish:
+            continue
+        elif i == iteration/2:
+            motors_speed('left')
+            rotation_finish = i + 75
+            rotation_state = True
+        elif distance_right is None:
             motors_speed('right')
         elif distance_left is None:
             motors_speed('left')
+        elif rotation_state_right:
+            if distance_left > 2*distance_min:
+                rotation_state_right = False
+            continue
+        elif rotation_state_left:
+            if distance_right > 2*distance_min:
+                rotation_state_left = False
+            continue
+        elif distance_left < distance_min:
+            motors_speed('right')
+            rotation_state_right = True
+        elif distance_right < distance_min:
+            motors_speed('left')
+            rotation_state_left = True
         else:
             diff = distance_right - distance_left
             add_speed = k_p*diff
@@ -125,29 +148,16 @@ if clientID != -1:
             list_x.append(x_prev)
             list_y.append(y_prev)
             continue
-        # print(i, list_position_right[i], list_position_left[i], list_distance_right[i], list_distance_left[i])
         right_step = angle_step(list_position_right[i], list_position_right[i-1])
         left_step = angle_step(list_position_left[i], list_position_left[i-1])
         diff_step = left_step - right_step
         orientation_now = orientation_prev - k_ori*diff_step
-        # print(orientation_now)
         x_right_step = right_step*sin(orientation_now)*k_pos + motor_position*(-cos(orientation_prev) + cos(orientation_now))
         y_right_step = right_step*cos(orientation_now)*k_pos + motor_position*(sin(orientation_prev) - sin(orientation_now))
         x_left_step = left_step*sin(orientation_now)*k_pos - motor_position*(-cos(orientation_prev) + cos(orientation_now))
         y_left_step = left_step*cos(orientation_now)*k_pos - motor_position*(sin(orientation_prev) - sin(orientation_now))
         x_step = (x_right_step + x_left_step)/2
         y_step = (y_right_step + y_left_step)/2
-        vector_step = sqrt(x_step**2 + y_step**2)
-        if vector_step > 0.0205:
-            vector_right_step = sqrt(x_right_step**2 + y_right_step**2)
-            vector_left_step = sqrt(x_left_step**2 + y_left_step**2)
-            if vector_right_step < vector_left_step:
-                x_step = x_right_step
-                y_step = y_right_step
-            else:
-                x_step = x_left_step
-                y_step = y_left_step
-        # print(sqrt(x_step**2 + y_step**2))
         x_now = x_prev - x_step
         y_now = y_prev + y_step
         list_x.append(x_now)
@@ -155,19 +165,18 @@ if clientID != -1:
         if list_distance_right[i] is not None:
             x_right = x_now + cos(orientation_now + pi/4)*(list_distance_right[i] + dead_zone)
             y_right = y_now + sin(orientation_now + pi/4)*(list_distance_right[i] + dead_zone)
-            list_x_right.append(x_right)
-            list_y_right.append(y_right)
+            list_x_sensor.append(x_right)
+            list_y_sensor.append(y_right)
         if list_distance_left[i] is not None:
             x_left = x_now - cos(orientation_now - pi/4)*(list_distance_left[i] + dead_zone)
             y_left = y_now - sin(orientation_now - pi/4)*(list_distance_left[i] + dead_zone)
-            list_x_left.append(x_left)
-            list_y_left.append(y_left)
+            list_x_sensor.append(x_left)
+            list_y_sensor.append(y_left)
         orientation_prev = orientation_now
         x_prev = x_now
         y_prev = y_now
     plot(list_x, list_y)
-    scatter(list_x_right, list_y_right)
-    scatter(list_x_left, list_y_left)
+    scatter(list_x_sensor, list_y_sensor)
     show()
 
     # Before closing the connection to CoppeliaSim, make sure that the last command sent out had time to arrive.
